@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Status {
+  Pending
+  Verified
+  Denied
+}
+
+model Provider {
+  id        Int     @id @default(autoincrement()) 
+  userid     String 
+  sitename String
+  consumers   Consumer[]
+  solarpanel  SolarPanel[]
+  address String
+  district String
+  state String
+  country String
+  status Status @default(Pending)
+  income Float?
+  coordinates Float[]
+  unitsavailable Int
+
+}
+
+model Consumer {
+  id        Int     @id @default(autoincrement())
+  userid     String 
+  provider   Provider @relation(fields: [providerId], references: [id])
+  providerId Int 
+  name   String
+  address String?
+  district String?
+  state String?
+  country String?
+  subscription Float?
+  status Status @default(Pending)
+  powergained Int  
+  coordinates Float[]
+  isconfirmed Boolean @default(false)
+}
+
+model SolarPanel {
+  id        Int     @id @default(autoincrement())
+  userid     String 
+  provider   Provider @relation(fields: [providerId], references: [id])
+  providerId Int 
+  manufacturer   String
+  model String
+  dimensions Int[]
+  outputpower Int
+  warranty Int
+  
+}

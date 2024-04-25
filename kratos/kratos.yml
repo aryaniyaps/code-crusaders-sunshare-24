@@ -1,0 +1,165 @@
+version: v1.1.0
+dsn: ""
+
+serve:
+  public:
+    base_url: http://localhost:4433/
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://localhost:3000
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+      allowed_headers:
+        - Authorization
+        - Cookie
+        - Content-Type
+      exposed_headers:
+        - Content-Type
+        - Set-Cookie
+        - Link
+  admin:
+    base_url: http://kratos:4434/
+
+session:
+  cookie:
+    domain: localhost
+    name: session
+  # sessions won't expire for 1 week
+  lifespan: 168h0m0s
+  whoami:
+    # users can use the application without completing a second factor
+    required_aal: aal1
+
+selfservice:
+  default_browser_return_url: http://localhost:3000/dashboard
+  allowed_return_urls:
+    - http://localhost:3000/dashboard
+    - http://localhost:3000/settings
+    - http://localhost:3000/settings/appearance
+    - http://localhost:3000/settings/internationalization
+    - http://localhost:3000/settings/sessions
+    - http://localhost:3000/verification
+
+  methods:
+    password:
+      enabled: false
+    totp:
+      config:
+        issuer: issuer.ory.sh
+      enabled: true
+    lookup_secret:
+      enabled: true
+    link:
+      enabled: false
+    code:
+      enabled: true
+      config:
+        lifespan: 15m
+    webauthn:
+      enabled: true
+      config:
+        passwordless: true
+        rp:
+          display_name: Starter
+          # Set 'id' to the top-level domain.
+          id: localhost
+          # Set 'origin' to the exact URL of the page that prompts the user to use WebAuthn. You must include the scheme, host, and port.
+          origins:
+            - http://localhost:3000
+    oidc:
+      enabled: true
+      config:
+        providers:
+          - id: google
+            provider: google
+            client_id: ""
+            client_secret: ""
+            issuer_url: https://accounts.google.com
+            mapper_url: file:///etc/config/kratos/data-mappers/oidc.google.jsonnet
+            auth_url: https://accounts.google.com/o/oauth2/v2/auth
+            token_url: https://www.googleapis.com/oauth2/v4/token
+            scope:
+              - email
+              - profile
+            # other supported scopes can be found in Google OAuth 2.0 dev docs
+            requested_claims:
+              id_token:
+                email:
+                  essential: true
+                email_verified:
+                  essential: true
+
+    profile:
+      enabled: true
+
+  flows:
+    settings:
+      ui_url: http://localhost:3000/settings
+      required_aal: highest_available
+      privileged_session_max_age: 5m
+
+    verification:
+      use: code
+      ui_url: http://localhost:3000/verification
+      enabled: true
+      notify_unknown_recipients: true
+
+    recovery:
+      use: code
+      ui_url: http://localhost:3000/recovery
+      enabled: true
+      notify_unknown_recipients: true
+      after:
+        hooks:
+          - hook: revoke_active_sessions
+
+    logout:
+      after:
+        default_browser_return_url: http://localhost:3000/login
+
+    login:
+      ui_url: http://localhost:3000/login
+      after:
+        hooks:
+          - hook: require_verified_address
+
+    registration:
+      lifespan: 15m
+      ui_url: http://localhost:3000/registration
+      after:
+        webauthn:
+          hooks:
+            # FIXME: session action is executed before the user is verified.
+            # therefore, users can access the app without verifying their email.
+            # if we remove the session action, the user will have to login once again after
+            # registration. This could improve security but reduce DX.
+            # https://github.com/ory/kratos/issues/3160
+            - hook: session
+            - hook: show_verification_ui
+
+        oidc:
+          hooks:
+            - hook: show_verification_ui
+            - hook: session
+    error:
+      ui_url: http://localhost:3000/error
+
+log:
+  level: debug
+
+identity:
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/identity.schema.json
+
+courier:
+  smtp:
+    connection_uri: smtp://mailhog:1025/?disable_starttls=true
+    from_address: noreply@localhost
+    from_name: Starter
+  template_override_path: /etc/config/kratos/email-templates
